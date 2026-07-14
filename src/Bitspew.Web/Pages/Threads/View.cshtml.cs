@@ -47,7 +47,7 @@ public class ViewThreadModel(BitspewDbContext db, PostSubmissionService submissi
     {
         var result = await submissions.ReplyAsync(id, Address.Trim(), SignedAtUnixSeconds, Body, Signature.Trim());
         if (result.Success)
-            return RedirectToPage("/Threads/View", new { id });
+            return Redirect($"/t/{id}");
 
         if (!await LoadAsync(id))
             return NotFound();

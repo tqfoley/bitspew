@@ -1,23 +1,6 @@
 // bitcoin-sign.js — self-contained Bitcoin "signmessage" implementation for the browser.
-// Zero dependencies: secp256k1 over BigInt, RFC 6979 deterministic nonces, RIPEMD-160 for
-// address derivation. Private keys never leave this script.
-//
-// Deliberately a CLASSIC script (not an ES module): proxies and optimizers such as
-// Cloudflare Rocket Loader rewrite <script type="module"> tags in ways that break import
-// statements. The public API is exposed as globalThis.bitcoinSign.
-
-(function () {
-'use strict';
-
-const VERSION = 4;
-
-// Debug logging; filter the browser console on "[bitcoin-sign]". Guarded so environments
-// without a console (e.g. the V8 test harness) don't break.
-function debug(...args) {
-    try { console.log('[bitcoin-sign]', ...args); } catch { /* no console available */ }
-}
-
-debug('script evaluating, version', VERSION);
+// Zero dependencies: secp256k1 over BigInt, RFC 6979 deterministic nonces via WebCrypto HMAC,
+// RIPEMD-160 for address derivation. Private keys never leave this module.
 
 // ---------- byte helpers ----------
 
@@ -81,7 +64,6 @@ function base64Encode(bytes) {
 // localhost), so a pure-JS SHA-256 keeps this page working on plain http:// deployments.
 
 const hasSubtleCrypto = typeof globalThis.crypto !== 'undefined' && !!globalThis.crypto.subtle;
-debug('hash backend:', hasSubtleCrypto ? 'WebCrypto (secure context)' : 'pure-JS fallback (no crypto.subtle)');
 
 const SHA256_K = [
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -337,10 +319,8 @@ async function base58CheckEncode(payload) {
 async function decodePrivateKey(input) {
     input = input.trim();
     if (/^[0-9a-fA-F]{64}$/.test(input)) {
-        debug('decodePrivateKey: raw hex key detected (treated as compressed)');
         return { priv: hexToBytes(input.toLowerCase()), compressed: true };
     }
-    debug('decodePrivateKey: attempting WIF decode, length', input.length);
     const decoded = base58Decode(input);
     if (decoded.length < 5) throw new Error('not a valid WIF private key');
     const payload = decoded.slice(0, -4);
@@ -350,14 +330,10 @@ async function decodePrivateKey(input) {
         throw new Error('WIF checksum mismatch — check the key for typos');
     if (payload[0] !== 0x80)
         throw new Error('not a mainnet private key (WIF version byte 0x' + payload[0].toString(16) + ')');
-    if (payload.length === 34 && payload[33] === 0x01) {
-        debug('decodePrivateKey: valid compressed-key WIF');
+    if (payload.length === 34 && payload[33] === 0x01)
         return { priv: payload.slice(1, 33), compressed: true };
-    }
-    if (payload.length === 33) {
-        debug('decodePrivateKey: valid uncompressed-key WIF');
+    if (payload.length === 33)
         return { priv: payload.slice(1), compressed: false };
-    }
     throw new Error('unrecognized WIF payload length');
 }
 
@@ -403,56 +379,48 @@ async function signRecoverable(privBytes, hashBytes) {
 }
 
 /// Generates a fresh random private key (compressed). Returns its WIF, public key, and address.
-async function generatePrivateKey() {
+export async function generatePrivateKey() {
     for (;;) {
         const priv = new Uint8Array(32);
         crypto.getRandomValues(priv);
         const d = bytesToBigInt(priv);
         if (d <= 0n || d >= N) continue; // astronomically rare; regenerate
         const publicKeyBytes = encodePublicKey(pointMultiply(d, G), true);
-        const result = {
+        return {
             wif: await base58CheckEncode(concatBytes([0x80], priv, [0x01])),
             publicKeyHex: bytesToHex(publicKeyBytes),
             address: await p2pkhAddress(publicKeyBytes),
         };
-        debug('generatePrivateKey: new key created, address', result.address);
-        return result;
     }
 }
 
 /// Derives the public key and P2PKH address for a WIF or 64-hex private key.
-async function derivePublicKey(privateKeyText) {
+export async function derivePublicKey(privateKeyText) {
     const { priv, compressed } = await decodePrivateKey(privateKeyText);
     const d = bytesToBigInt(priv);
     if (d <= 0n || d >= N) throw new Error('private key is out of range');
     const publicKeyBytes = encodePublicKey(pointMultiply(d, G), compressed);
-    const result = {
+    return {
         publicKeyHex: bytesToHex(publicKeyBytes),
         address: await p2pkhAddress(publicKeyBytes),
         compressed,
     };
-    debug('derivePublicKey: address', result.address);
-    return result;
 }
 
 /// Signs a message with the "Bitcoin Signed Message" standard. Returns the public key,
 /// P2PKH address, base64 compact signature, and an Electrum-style signed-message block.
-async function signBitcoinMessage(privateKeyText, message) {
-    debug('signBitcoinMessage: start, message length', message.length);
+export async function signBitcoinMessage(privateKeyText, message) {
     const { priv, compressed } = await decodePrivateKey(privateKeyText);
     const d = bytesToBigInt(priv);
     if (d <= 0n || d >= N) throw new Error('private key is out of range');
 
     const publicKeyBytes = encodePublicKey(pointMultiply(d, G), compressed);
     const address = await p2pkhAddress(publicKeyBytes);
-    debug('signBitcoinMessage: signing as', address);
 
     const hash = await bitcoinMessageHash(message);
-    debug('signBitcoinMessage: message digest computed');
     const { r, s, recoveryId } = await signRecoverable(priv, hash);
     const header = 27 + recoveryId + (compressed ? 4 : 0);
     const signature = base64Encode(concatBytes([header], bigIntTo32Bytes(r), bigIntTo32Bytes(s)));
-    debug('signBitcoinMessage: done, recoveryId', recoveryId, 'header byte', header);
 
     return {
         publicKeyHex: bytesToHex(publicKeyBytes),
@@ -464,15 +432,3 @@ async function signBitcoinMessage(privateKeyText, message) {
             '\n-----END BITCOIN SIGNED MESSAGE-----',
     };
 }
-
-globalThis.bitcoinSign = {
-    version: VERSION,
-    signBitcoinMessage,
-    derivePublicKey,
-    generatePrivateKey,
-    _internals: { sha256Js, ripemd160, utf8Encode, bytesToHex }, // exposed for the test harness
-};
-
-debug('API registered as window.bitcoinSign');
-
-})();

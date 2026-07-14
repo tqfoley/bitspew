@@ -49,6 +49,6 @@ public class NewModel(PostSubmissionService submissions, TimeProvider clock) : P
             return Page();
         }
 
-        return RedirectToPage("/Threads/View", new { id = result.ThreadId });
+        return Redirect($"/t/{result.ThreadId}");
     }
 }
