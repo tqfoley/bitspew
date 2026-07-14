@@ -19,8 +19,9 @@
         <input class="form-control font-monospace" id="private-key" type="password"
                autocomplete="off" spellcheck="false" placeholder="K..., L..., 5..., or hex" />
         <button class="btn btn-outline-secondary" type="button" id="toggle-key">Show</button>
+        <button class="btn btn-outline-primary" type="button" id="generate-key">Generate new key</button>
     </div>
-    <div class="form-text" id="key-status">Public key and address appear here once a valid key is entered.</div>
+    <div class="form-text" id="key-status">Loading signing module&hellip;</div>
 </div>
 
 <div class="mb-3">
@@ -63,25 +64,51 @@
 </div>
 
 @section Scripts {
+    <script>
+        // Plain script (not a module) so Show/Hide works even if the signing module fails to load.
+        (function () {
+            var toggle = document.getElementById('toggle-key');
+            var input = document.getElementById('private-key');
+            toggle.addEventListener('click', function () {
+                var hidden = input.type === 'password';
+                input.type = hidden ? 'text' : 'password';
+                toggle.textContent = hidden ? 'Hide' : 'Show';
+            });
+            window.addEventListener('error', function (e) {
+                var status = document.getElementById('key-status');
+                if (status && e.message) status.textContent = 'Script error: ' + e.message;
+            });
+        })();
+    </script>
     <script type="module">
-        import { signBitcoinMessage, derivePublicKey } from '/js/bitcoin-sign.js';
+        import { signBitcoinMessage, derivePublicKey, generatePrivateKey } from '/js/bitcoin-sign.js';
 
         const el = id => document.getElementById(id);
+        const READY_HINT = 'Ready. Paste a private key, or click "Generate new key".';
         const showError = text => {
             el('error').textContent = text;
             el('error').classList.toggle('d-none', !text);
         };
 
-        el('toggle-key').addEventListener('click', () => {
-            const input = el('private-key');
-            const hidden = input.type === 'password';
-            input.type = hidden ? 'text' : 'password';
-            el('toggle-key').textContent = hidden ? 'Hide' : 'Show';
-        });
+        async function copyText(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return;
+            }
+            // http:// pages have no clipboard API; fall back to the legacy path
+            const scratch = document.createElement('textarea');
+            scratch.value = text;
+            scratch.style.position = 'fixed';
+            scratch.style.opacity = '0';
+            document.body.appendChild(scratch);
+            scratch.select();
+            document.execCommand('copy');
+            document.body.removeChild(scratch);
+        }
 
         el('private-key').addEventListener('input', async () => {
             const value = el('private-key').value.trim();
-            if (!value) { el('key-status').textContent = 'Public key and address appear here once a valid key is entered.'; return; }
+            if (!value) { el('key-status').textContent = READY_HINT; return; }
             try {
                 const info = await derivePublicKey(value);
                 el('key-status').textContent =
@@ -91,13 +118,28 @@
             }
         });
 
+        el('generate-key').addEventListener('click', async () => {
+            showError('');
+            try {
+                const keyInfo = await generatePrivateKey();
+                const input = el('private-key');
+                input.value = keyInfo.wif;
+                input.type = 'text';
+                el('toggle-key').textContent = 'Hide';
+                el('key-status').textContent =
+                    `New key generated — save it somewhere safe, it exists only on this page. Address ${keyInfo.address}`;
+            } catch (e) {
+                showError(e.message);
+            }
+        });
+
         el('sign-button').addEventListener('click', async () => {
             showError('');
             el('results').classList.add('d-none');
             try {
                 const key = el('private-key').value;
                 const message = el('message').value;
-                if (!key.trim()) throw new Error('Enter a private key.');
+                if (!key.trim()) throw new Error('Enter a private key, or click "Generate new key".');
                 if (!message) throw new Error('Enter a message to sign.');
                 const result = await signBitcoinMessage(key, message);
                 el('public-key').value = result.publicKeyHex;
@@ -112,11 +154,13 @@
 
         for (const button of document.querySelectorAll('.copy-btn')) {
             button.addEventListener('click', async () => {
-                await navigator.clipboard.writeText(el(button.dataset.copy).value);
+                await copyText(el(button.dataset.copy).value);
                 const label = button.textContent;
                 button.textContent = 'Copied!';
                 setTimeout(() => button.textContent = label, 1200);
             });
         }
+
+        el('key-status').textContent = READY_HINT;
     </script>
 }
