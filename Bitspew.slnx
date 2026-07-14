@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Bitspew.Core/Bitspew.Core.csproj" />
+    <Project Path="src/Bitspew.Web/Bitspew.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Bitspew.Core.Tests/Bitspew.Core.Tests.csproj" />
+  </Folder>
+</Solution>

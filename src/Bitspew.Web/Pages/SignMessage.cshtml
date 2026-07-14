@@ -1,0 +1,122 @@
+@page
+@model Bitspew.Web.Pages.SignMessageModel
+@{
+    ViewData["Title"] = "Sign a message";
+}
+
+<h1 class="h3 mb-3">Sign a message</h1>
+
+<div class="alert alert-info">
+    Signing happens <strong>entirely in your browser</strong> — this page has no form submission
+    and your private key is never sent to the server. Even so, pasting a key into any web page
+    carries risk: prefer signing in your own wallet for keys that hold real funds, and use a
+    dedicated posting key here.
+</div>
+
+<div class="mb-3">
+    <label class="form-label" for="private-key">Private key (WIF or 64-char hex)</label>
+    <div class="input-group">
+        <input class="form-control font-monospace" id="private-key" type="password"
+               autocomplete="off" spellcheck="false" placeholder="K..., L..., 5..., or hex" />
+        <button class="btn btn-outline-secondary" type="button" id="toggle-key">Show</button>
+    </div>
+    <div class="form-text" id="key-status">Public key and address appear here once a valid key is entered.</div>
+</div>
+
+<div class="mb-3">
+    <label class="form-label" for="message">Message to sign</label>
+    <textarea class="form-control font-monospace" id="message" rows="7"
+              placeholder="Paste the exact text to sign — e.g. the payload from the New thread page."></textarea>
+</div>
+
+<button class="btn btn-primary" type="button" id="sign-button">Sign message</button>
+
+<div id="error" class="alert alert-danger mt-3 d-none"></div>
+
+<div id="results" class="mt-4 d-none">
+    <div class="mb-3">
+        <label class="form-label" for="public-key">Public key (hex)</label>
+        <div class="input-group">
+            <input class="form-control font-monospace" id="public-key" readonly />
+            <button class="btn btn-outline-secondary copy-btn" type="button" data-copy="public-key">Copy</button>
+        </div>
+    </div>
+    <div class="mb-3">
+        <label class="form-label" for="address">Address (P2PKH)</label>
+        <div class="input-group">
+            <input class="form-control font-monospace" id="address" readonly />
+            <button class="btn btn-outline-secondary copy-btn" type="button" data-copy="address">Copy</button>
+        </div>
+    </div>
+    <div class="mb-3">
+        <label class="form-label" for="signature">Signature (base64) — paste this into the publish form</label>
+        <div class="input-group">
+            <input class="form-control font-monospace" id="signature" readonly />
+            <button class="btn btn-outline-secondary copy-btn" type="button" data-copy="signature">Copy</button>
+        </div>
+    </div>
+    <div class="mb-3">
+        <label class="form-label" for="signed-block">Complete signed message</label>
+        <textarea class="form-control font-monospace" id="signed-block" rows="9" readonly></textarea>
+        <button class="btn btn-outline-secondary btn-sm mt-2 copy-btn" type="button" data-copy="signed-block">Copy signed message</button>
+    </div>
+</div>
+
+@section Scripts {
+    <script type="module">
+        import { signBitcoinMessage, derivePublicKey } from '/js/bitcoin-sign.js';
+
+        const el = id => document.getElementById(id);
+        const showError = text => {
+            el('error').textContent = text;
+            el('error').classList.toggle('d-none', !text);
+        };
+
+        el('toggle-key').addEventListener('click', () => {
+            const input = el('private-key');
+            const hidden = input.type === 'password';
+            input.type = hidden ? 'text' : 'password';
+            el('toggle-key').textContent = hidden ? 'Hide' : 'Show';
+        });
+
+        el('private-key').addEventListener('input', async () => {
+            const value = el('private-key').value.trim();
+            if (!value) { el('key-status').textContent = 'Public key and address appear here once a valid key is entered.'; return; }
+            try {
+                const info = await derivePublicKey(value);
+                el('key-status').textContent =
+                    `Address ${info.address} (${info.compressed ? 'compressed' : 'uncompressed'} key)`;
+            } catch (e) {
+                el('key-status').textContent = e.message;
+            }
+        });
+
+        el('sign-button').addEventListener('click', async () => {
+            showError('');
+            el('results').classList.add('d-none');
+            try {
+                const key = el('private-key').value;
+                const message = el('message').value;
+                if (!key.trim()) throw new Error('Enter a private key.');
+                if (!message) throw new Error('Enter a message to sign.');
+                const result = await signBitcoinMessage(key, message);
+                el('public-key').value = result.publicKeyHex;
+                el('address').value = result.address;
+                el('signature').value = result.signature;
+                el('signed-block').value = result.signedBlock;
+                el('results').classList.remove('d-none');
+            } catch (e) {
+                showError(e.message);
+            }
+        });
+
+        for (const button of document.querySelectorAll('.copy-btn')) {
+            button.addEventListener('click', async () => {
+                await navigator.clipboard.writeText(el(button.dataset.copy).value);
+                const label = button.textContent;
+                button.textContent = 'Copied!';
+                setTimeout(() => button.textContent = label, 1200);
+            });
+        }
+    </script>
+}

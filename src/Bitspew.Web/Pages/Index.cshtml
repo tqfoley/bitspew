@@ -1,0 +1,33 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Threads";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Threads</h1>
+    <a class="btn btn-primary" asp-page="/Threads/New">New thread</a>
+</div>
+
+@if (Model.Threads.Count == 0)
+{
+    <p class="text-muted">No threads yet. Start one — all it takes is a Bitcoin key.</p>
+}
+else
+{
+    <div class="list-group">
+        @foreach (var thread in Model.Threads)
+        {
+            <a class="list-group-item list-group-item-action" href="/t/@thread.Id">
+                <div class="d-flex w-100 justify-content-between">
+                    <h2 class="h6 mb-1">@thread.Title</h2>
+                    <small class="text-muted">@thread.LastActivity.ToString("yyyy-MM-dd HH:mm") UTC</small>
+                </div>
+                <small class="text-muted">
+                    <code>@thread.Address</code>
+                    &middot; @thread.PostCount @(thread.PostCount == 1 ? "post" : "posts")
+                </small>
+            </a>
+        }
+    </div>
+}
