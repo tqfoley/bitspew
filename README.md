@@ -2,17 +2,22 @@
 
 Post message or thread with proof of funds on blockchains.
 
-A message board where identity is a Bitcoin keypair: every post is signed with the
-"Bitcoin Signed Message" standard and verified against the poster's address. Post and
-thread ids are content hashes (double-SHA256), so they are self-verifying and
-tamper-evident, like Bitcoin txids.
+Right now it's a minimal message board: post a message, it's saved to Postgres, and
+everyone sees it on the "For you" feed. The whole site is served under the `/bitspew/`
+path prefix.
+
+Bitcoin-signed posts (identity = a Bitcoin keypair, every post verified with the
+"Bitcoin Signed Message" standard) are planned; the signature verification machinery
+lives in `Bitspew.Core` and is fully tested, but the posting flow doesn't require
+signing yet.
 
 ## Projects
 
 - `src/Bitspew.Core` — signature verification (messages and raw transactions), canonical
-  signing payloads, content-hash ids. Built on NBitcoin.
-- `src/Bitspew.Web` — ASP.NET Core (Razor Pages) board: thread list, thread view with
-  per-post signature badges, and a sign-in-your-own-wallet posting flow.
+  signing payloads, content-hash ids, and the `Message` entity. Built on NBitcoin.
+- `src/Bitspew.Web` — ASP.NET Core (Razor Pages) site: the "For you" feed at
+  `/bitspew/ForYou/` where anyone can post a message and read all messages, plus an
+  in-browser message-signing utility page at `/bitspew/SignMessage`.
 - `tests/Bitspew.Core.Tests` — xUnit tests, including wallet-interop vectors.
 
 ## Setup
@@ -33,13 +38,14 @@ Requires the .NET 10 SDK and a [Neon](https://neon.tech) Postgres database.
    dotnet run --project src/Bitspew.Web
    ```
 
-## Posting flow
+   Then open `http://localhost:5013/bitspew/ForYou/`.
 
-1. Fill in title/body and your Bitcoin address (`1...`, `3...`, or `bc1q...`).
-2. The site shows the exact canonical text to sign; it embeds the thread id, address, and a
-   timestamp so signatures cannot be replayed elsewhere or later (15-minute window).
-3. Sign it in your own wallet (Electrum: Tools → Sign/Verify Message; Bitcoin Core:
-   `signmessage`) — private keys never touch the server — and paste the base64 signature.
+## Path base / reverse proxy
+
+The app treats `/bitspew` as its public root. It accepts requests both with the prefix
+intact (local dev) and with the prefix already stripped by a reverse proxy (production:
+Cloudflare → AWS, where the proxy forwards `/bitspew/*` to the app without the prefix).
+Either way, every generated link, form action, and static-asset URL carries `/bitspew/`.
 
 ## Tests
 

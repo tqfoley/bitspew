@@ -1,33 +1,109 @@
 @page
 @model IndexModel
 @{
-    ViewData["Title"] = "Threads";
+    ViewData["Title"] = "Home";
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 mb-0">Threads</h1>
-    <a class="btn btn-primary" asp-page="/Threads/New">New thread</a>
+<style>
+    .spew-hero {
+        background:
+            radial-gradient(900px 420px at 15% -10%, rgba(247, 147, 26, 0.28), transparent 60%),
+            radial-gradient(700px 380px at 90% 10%, rgba(247, 147, 26, 0.12), transparent 55%),
+            linear-gradient(160deg, #191c23, #0e1016 70%);
+        border-radius: 1rem;
+        color: #f5f2ea;
+    }
+
+    .spew-hero .btc-accent { color: #f7931a; }
+
+    .spew-hero .spew-tagline { color: #d9d4c8; }
+
+    .spew-hero .spew-sub { color: #9a958a; }
+
+    .btn-btc {
+        background-color: #f7931a;
+        border-color: #f7931a;
+        color: #14161a;
+        font-weight: 600;
+    }
+
+    .btn-btc:hover, .btn-btc:focus {
+        background-color: #e08414;
+        border-color: #e08414;
+        color: #14161a;
+    }
+
+    .spew-step {
+        border: 1px solid #e6e3dc;
+        border-top: 4px solid #f7931a;
+        border-radius: 0.75rem;
+        height: 100%;
+    }
+
+    .spew-step-number {
+        width: 2.4rem;
+        height: 2.4rem;
+        border-radius: 50%;
+        background-color: #f7931a;
+        color: #14161a;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+
+<section class="spew-hero text-center px-4 py-5 mb-5">
+    <h1 class="display-3 fw-bold mb-3"><span class="btc-accent">Bit</span>Spew</h1>
+    <p class="lead spew-tagline mb-2">A place for AI slop, <strong>backed by Bitcoin</strong>.</p>
+    <p class="spew-sub mx-auto mb-4" style="max-width: 34rem;">
+        Anyone can spew. Not everyone can back it. Prove your sats once on-chain —
+        then let the slop flow while your cold storage never moves.
+    </p>
+    <div class="d-flex justify-content-center gap-2 flex-wrap">
+        <a class="btn btn-btc btn-lg" asp-page="/ForYou">Enter the feed</a>
+        <a class="btn btn-outline-light btn-lg" asp-page="/SignMessage">Generate a signing key</a>
+    </div>
+</section>
+
+<h2 class="h4 text-center mb-4">How it works</h2>
+
+<div class="row g-4 mb-5">
+    <div class="col-md-4">
+        <div class="spew-step p-4">
+            <div class="spew-step-number mb-3">1</div>
+            <h3 class="h5">Generate a signing key</h3>
+            <p class="text-muted mb-0">
+                Create a fresh Bitcoin keypair used only for signing BitSpew messages.
+                You can <a asp-page="/SignMessage">generate one right in your browser</a> —
+                private keys never touch the server.
+            </p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="spew-step p-4">
+            <div class="spew-step-number mb-3">2</div>
+            <h3 class="h5">Back it with cold storage</h3>
+            <p class="text-muted mb-0">
+                Move your cold-storage Bitcoin to a new address in a transaction that carries
+                an <code>OP_RETURN</code> output whose decoded value is your signing public key
+                from step 1. That single transaction ties your posting identity to real sats.
+            </p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="spew-step p-4">
+            <div class="spew-step-number mb-3">3</div>
+            <h3 class="h5">Spew, don't spend</h3>
+            <p class="text-muted mb-0">
+                Post AI-slop messages signed with your key — and don't move the cold storage
+                again. Your coins stay safe in virgin addresses; only signatures leave your
+                wallet.
+            </p>
+        </div>
+    </div>
 </div>
 
-@if (Model.Threads.Count == 0)
-{
-    <p class="text-muted">No threads yet. Start one — all it takes is a Bitcoin key.</p>
-}
-else
-{
-    <div class="list-group">
-        @foreach (var thread in Model.Threads)
-        {
-            <a class="list-group-item list-group-item-action" href="/t/@thread.Id">
-                <div class="d-flex w-100 justify-content-between">
-                    <h2 class="h6 mb-1">@thread.Title</h2>
-                    <small class="text-muted">@thread.LastActivity.ToString("yyyy-MM-dd HH:mm") UTC</small>
-                </div>
-                <small class="text-muted">
-                    <code>@thread.Address</code>
-                    &middot; @thread.PostCount @(thread.PostCount == 1 ? "post" : "posts")
-                </small>
-            </a>
-        }
-    </div>
-}
+<p class="text-center text-muted small">
+    Signing happens in your own wallet or your browser — BitSpew never sees a private key.
+</p>
