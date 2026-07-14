@@ -25,6 +25,17 @@ using (var scope = app.Services.CreateScope())
     scope.ServiceProvider.GetRequiredService<BitspewDbContext>().Database.Migrate();
 }
 
+app.UsePathBase("/Bitspew");
+app.Use(async (context, next) =>
+{
+    if (!context.Request.PathBase.Equals("/Bitspew", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.Redirect("/Bitspew" + context.Request.Path + context.Request.QueryString);
+        return;
+    }
+    await next();
+});
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {

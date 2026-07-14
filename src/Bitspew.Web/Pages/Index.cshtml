@@ -18,7 +18,7 @@ else
     <div class="list-group">
         @foreach (var thread in Model.Threads)
         {
-            <a class="list-group-item list-group-item-action" href="/t/@thread.Id">
+            <a class="list-group-item list-group-item-action" asp-page="/Threads/View" asp-route-id="@thread.Id">
                 <div class="d-flex w-100 justify-content-between">
                     <h2 class="h6 mb-1">@thread.Title</h2>
                     <small class="text-muted">@thread.LastActivity.ToString("yyyy-MM-dd HH:mm") UTC</small>
